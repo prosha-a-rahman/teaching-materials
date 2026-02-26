@@ -2,7 +2,7 @@
 title: "MATH2089 Lab 2"
 format: 
   html:
-    embed-resources: true
+    self-contained: true
 jupyter: python3
 ---
 
