@@ -1,0 +1,528 @@
+---
+title: "MATH2089 Week 4 Lab"
+subtitle: "Sampling Distributions and The Central Limit Theorem"
+format:
+  html:
+    code-fold: false
+    toc: true
+    number-sections: false
+    embed-resources: true
+jupyter: python3
+---
+
+In this week's lab we examine the *Law of Large Numbers (LLN)* and *Central Limit Theorem (CLT).* The LLN implies that the average of a function of a random sample will converge to the expected value of that function. Symbolically, if $X_1, \ldots, X_n$ is an independent sample from the distribution $F$, then, for any function $g$ (with some mild technical constraints on what types of functions $g$ can be),
+
+$$
+\frac{1}{n}\sum_{i=1}^{n} g(X_i) \rightarrow \mathbb{E}g(X) = \int_{\mathbb{R}} g(t) f(t)\,\mathrm{d}t,
+$$
+
+where convergence is *in probability (weak LLN)* or *almost surely (strong LLN)*. This is the most important result in statistics and tells us that—for sufficiently large samples—estimates computed from sample averages should approximate the *true value.* The CLT is a subsequent result that describes the distribution of sample averages around the true value. In the simplest case, let $\mu$ and $\sigma$ respectively denote the *finite* mean and standard deviation of $F$, and define the sequence of random variables
+
+$$
+Y_n := \sqrt{n}\frac{\overline{X}_n - \mu}{\sigma},
+$$
+
+where $\overline{X}_n = n^{-1}\sum_{i=1}^{n} X_i$. Then $Y_n \rightarrow N(0,1)$ in distribution—the distribution of $Y_n$ converges to the standard Normal distribution, even if we don't know the exact distribution of $Y_n$, or even $F$. The sequence $Y_1, \ldots, Y_n$ is called the sequence of *standardised* sample means since
+
+$$
+\mathbb{E}Y_n = \frac{\sqrt{n}}{\sigma}\left(\mathbb{E}\overline{X}_n - \mu\right) = 0
+$$
+
+and
+
+$$
+\text{Var}(Y_n) = \frac{n}{\sigma^2}\text{Var}(\overline{X}_n) = 1.
+$$
+
+The CLT is a useful result that gives us more information about how variable our estimates are around the true value. For sufficiently large $n$ we can apply the location-scale structure of the Normal distribution to generate the approximation
+
+$$
+\frac{X_1 + \cdots + X_n}{n} =: \overline{X}_n \overset{\text{approx}}{\sim} N\!\left(\mu,\; \frac{\sigma}{\sqrt{n}}\right).
+$$
+
+The power of the CLT is that it works as long as the variance of the distribution $\sigma^2 < \infty$, regardless of the form that the distribution $F$ takes. The upshot is that we can simulate sample means and generate confidence intervals about the population mean using the Normal distribution. Note here that the variance of the sample mean $\text{Var}(\overline{X}_n) = \sigma^2/n \rightarrow 0$. This implies that the sample mean converges to $\mu$ in *Mean Squared Error*, which itself implies the WLLN.
+
+```{python}
+#| label: setup
+#| echo: true
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
+
+# Set a random seed for reproducibility
+rng = np.random.default_rng(2089)
+```
+
+## Exercise 2
+
+In this question we'll take a look at the Central Limit Theorem for Bernoulli random variables. Bernoulli distributions can be used to examine population proportions, so applying the CLT will let us make inference on the true population proportion by using the observed sample proportion and the Normal distribution. Let $X_1, \ldots, X_n$ be an independent sequence of $\text{Ber}(p)$ random variables — recall that $\text{Ber}(p) \equiv \text{Bin}(1, p)$. Then $0 \leq \overline{X}_n \leq 1$. Consider a *sequence of $R$ samples of size $n$*
+
+$$
+\begin{aligned}
+&\{X_{1,1}, \ldots, X_{1,n}\} \mapsto \overline{X}_{1,n} \\
+&\{X_{2,1}, \ldots, X_{2,n}\} \mapsto \overline{X}_{2,n} \\
+&\qquad\vdots \\
+&\{X_{R,1}, \ldots, X_{R,n}\} \mapsto \overline{X}_{R,n}
+\end{aligned}
+$$
+
+where $\overline{X}_{1,n}, \ldots, \overline{X}_{R,n}$ is the corresponding sequence of sample means. We wish to simulate the sample means. The independence of the data implies that we can write the samples into the matrix
+
+$$
+B = \begin{bmatrix}
+X_{11} & X_{12} & \cdots & X_{1n} \\
+X_{21} & X_{22} & \cdots & X_{2n} \\
+\vdots & \cdots & \ddots & \vdots \\
+X_{R1} & X_{R2} & \cdots & X_{Rn}
+\end{bmatrix},
+$$
+
+where each row defines a sample. We can then compute the row-wise means.
+
+### (a) Simulate the Bernoulli samples
+
+```{python}
+#| label: ex2-simulate
+# Set the sample size n
+sample_size = 100
+
+# Set the number of replicate samples R
+number_replicates = 500
+
+# Set the Bernoulli parameter p
+bernoulli_parameter = 0.5
+
+# Construct an R-by-n matrix of Ber(p) random variables
+# Each row is one sample of size n
+bernoulli_samples = stats.binom.rvs(n = 1, 
+                                    p = bernoulli_parameter,
+                                    size = (number_replicates, sample_size))
+
+# Compute the row-wise mean of each of the R samples
+# axis = 1 computes the mean across columns (i.e., across each row)
+sample_averages = bernoulli_samples.mean(axis = 1)
+
+
+```
+
+### (c) Compare empirical and theoretical moments
+
+Theoretically,
+
+$$
+\mathbb{E}\overline{X}_n = \frac{1}{n}(np) = p
+$$
+
+and
+
+$$
+\text{Var}(\overline{X}_n) = \frac{np(1-p)}{n^2} = \frac{p(1-p)}{n}.
+$$
+
+So, for a sufficiently large number of replicate samples $R$, we should expect the *average of the sample averages* to be close to $p$ and the sample variance of the sample averages to be close to $p(1-p)/n$.
+
+```{python}
+#| label: ex2-moments
+# Empirical mean and variance of the sample averages
+empirical_mean = sample_averages.mean()
+empirical_var = sample_averages.var(ddof=1)
+
+# Theoretical mean and variance of the sample mean
+theoretical_mean = bernoulli_parameter
+theoretical_var = bernoulli_parameter * (1 - bernoulli_parameter) / sample_size
+
+print("Comparison of empirical vs theoretical moments:")
+print(f"  Mean  — Empirical: {empirical_mean:.6f},  Theoretical: {theoretical_mean:.6f}")
+print(f"  Var   — Empirical: {empirical_var:.6f},  Theoretical: {theoretical_var:.6f}")
+```
+
+The empirical values will converge to the theoretical values as the number of samples $R$ increases.
+
+```{python}
+#| label: ex2-overall
+# The average of ALL elements in B. Why is this equal to the average of
+# the sample averages?
+print(f"Mean of all elements in B: {bernoulli_samples.mean():.6f}")
+print(f"Mean of sample averages:   {sample_averages.mean():.6f}")
+
+# The variance of ALL elements in B. Why is this different to the
+# variance of the sample averages?
+print(f"\nVar of all elements in B:  {bernoulli_samples.var(ddof=1):.6f}")
+print(f"Var of sample averages:    {sample_averages.var(ddof=1):.6f}")
+```
+
+The overall mean of $B$ equals the mean of the sample averages because the grand mean is the average of the row means when all rows have the same length. The variance of all elements in $B$ is approximately $p(1-p)$, while the variance of the sample averages is approximately $p(1-p)/n$ — the latter is smaller by a factor of $n$ due to averaging.
+
+### (d) Histogram and CLT
+
+The CLT implies that the sample mean will be approximately Normally distributed. Let's construct a density histogram and overlay the expected Normal density.
+
+```{python}
+#| label: ex2-histogram
+#| fig-cap: "Histogram of sample averages of Bernoulli random variables with fitted Normal density"
+
+number_bins = 10
+
+plt.hist(sample_averages, number_bins, density = True)
+
+# set parameters for asymptotic Normal distribution
+x_grid = np.linspace(sample_averages.min() - 0.02,
+                     sample_averages.max() + 0.02, 
+                     300) 
+clt_mean = bernoulli_parameter
+clt_scale = np.sqrt(bernoulli_parameter * (1 - bernoulli_parameter) / sample_size)
+
+
+plt.plot(x_grid, stats.norm.pdf(x_grid, loc = clt_mean, scale = clt_scale))
+plt.axvline(empirical_mean, color = 'red')
+plt.axvline(bernoulli_parameter, color = "black", linestyle = ":")
+plt.show()
+```
+
+The histogram appears roughly bell-shaped about the empirical average, indicating that the sample averages are approximately Normally distributed, even though the generating distribution (Bernoulli) is not Normal. This is the Central Limit Theorem in action.
+
+## Exercise 3
+
+In the previous question we examined the Central Limit Theorem for a non-Normal discrete distribution. In this question we'll repeat the examination for a non-Normal continuous distribution.
+
+### (a) Explore the Kevlar data
+
+The file `kevlar90.txt` contains times to failure (in hours) for $n = 101$ strands of Kevlar 49/epoxy tested at a stress level of 90%.
+
+```{python}
+#| label: ex3-load-data
+# Load the kevlar90 data
+# Adjust the file path below to match your local setup
+try:
+    kevlar90 = np.loadtxt("data/kevlar90.txt")
+except FileNotFoundError:
+    try:
+        kevlar90 = np.loadtxt("kevlar90.txt")
+    except FileNotFoundError:
+        # If the file is not found, generate representative data from
+        # an Exponential distribution with mean ≈ 1.0239
+        print("kevlar90.txt not found — generating representative Exponential data.")
+        kevlar90 = rng.exponential(scale=1.0239, size=101)
+
+print(f"Number of data points: {len(kevlar90)}")
+print(f"First 10 values: {kevlar90[:10].round(4)}")
+```
+
+#### (i) Density histogram
+
+```{python}
+#| label: ex3-histogram-data
+#| fig-cap: "Density histogram for kevlar90 failure times"
+n_data = len(kevlar90)
+number_bins = int(np.ceil(np.sqrt(n_data)))
+
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.hist(kevlar90, bins=number_bins, density=True,
+        edgecolor='black', alpha=0.7)
+ax.set_xlabel('Failure time (hours)')
+ax.set_ylabel('Density')
+ax.set_title('Density histogram for kevlar90')
+plt.tight_layout()
+plt.show()
+```
+
+The data are clearly not Normally distributed — the histogram is not bell-shaped. Most of the data are concentrated at small positive values, with a thin tail extending to larger positive values. The data are right-skewed and positive-valued, which is consistent with an Exponential distribution.
+
+#### (ii) Sample mean
+
+```{python}
+#| label: ex3-sample-mean
+kevlar_mean = kevlar90.mean()
+kevlar_std = kevlar90.std(ddof=1)
+
+print(f"Sample mean:     x̄ = {kevlar_mean:.4f}")
+print(f"Sample std dev:  s = {kevlar_std:.4f}")
+```
+
+#### (iii) Method of moments fit
+
+Recall that for the $\text{Exp}(\mu)$ distribution, both the expectation and the standard deviation equal $\mu$. The method of moments estimator is $\hat{\mu} = \overline{x}$. The fitted Exponential density is
+
+$$
+f(x) = \frac{1}{\hat{\mu}} e^{-x/\hat{\mu}}, \quad x > 0.
+$$
+
+The sample mean and sample standard deviation being close to each other provides some (weak) evidence that the data follow an Exponential distribution.
+
+```{python}
+#| label: ex3-mom
+print(f"Fitted Exp parameter: μ̂ = x̄ = {kevlar_mean:.4f}")
+print(f"Fitted Exp std dev:   μ̂ = {kevlar_mean:.4f}")
+print(f"Sample std dev:       s = {kevlar_std:.4f}")
+print(f"\nThese are reasonably close, supporting the Exponential fit.")
+```
+
+#### (iv) Overlay the fitted Exponential density
+
+```{python}
+#| label: ex3-overlay
+#| fig-cap: "Density histogram with fitted Exponential density for kevlar90"
+fig, ax = plt.subplots(figsize=(8, 5))
+
+ax.hist(kevlar90, bins=number_bins, density=True,
+        edgecolor='black', alpha=0.7, label='Histogram')
+
+# Overlay fitted Exponential density
+x_grid = np.linspace(0, kevlar90.max() * 1.1, 300)
+exp_pdf = stats.expon.pdf(x_grid, scale=kevlar_mean)
+ax.plot(x_grid, exp_pdf, 'r-', linewidth=2,
+        label=f'Exp(μ̂={kevlar_mean:.4f}) density')
+
+ax.set_xlabel('Failure time (hours)')
+ax.set_ylabel('Density')
+ax.set_title('Density histogram with fitted Exponential density')
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+The fitted Exponential density follows the shape of the histogram well. We see that the exponential decay in the density resembles the reduced heights of the histogram bars. Both the data and density are notably asymmetric and defined for positive values.
+
+### (b) Sampling distribution of the mean — $n = 10$
+
+We now use the fitted parameter $\hat{\mu} = \overline{x}$ to simulate samples from the Exponential distribution and examine the sampling distribution of the mean for samples of size $n = 10$.
+
+#### (i) Simulate Exponential samples
+
+```{python}
+#| label: ex3b-simulate
+sample_size_b = 10
+number_replicates_b = 1000
+
+# Simulate an R-by-n matrix of Exp(μ̂) random variables
+exponential_samples = rng.exponential(
+    scale=kevlar_mean,
+    size=(number_replicates_b, sample_size_b)
+)
+
+print(f"Matrix shape: {exponential_samples.shape}")
+print(f"  ({number_replicates_b} samples, each of size {sample_size_b})")
+```
+
+#### (ii) Compute sample means
+
+```{python}
+#| label: ex3b-means
+mean_T = exponential_samples.mean(axis=1)
+print(f"Number of sample means: {len(mean_T)}")
+```
+
+#### (iii) Compare empirical and theoretical moments
+
+For $X_i \sim \text{Exp}(\mu)$, we have $\mathbb{E}(X_i) = \mu$ and $\text{Var}(X_i) = \mu^2$. Therefore:
+
+$$
+\mathbb{E}(\overline{X}_n) = \mu, \qquad \text{Var}(\overline{X}_n) = \frac{\mu^2}{n}.
+$$
+
+```{python}
+#| label: ex3b-moments
+empirical_mean_T = mean_T.mean()
+empirical_var_T = mean_T.var(ddof=1)
+
+theoretical_mean_T = kevlar_mean
+theoretical_var_T = kevlar_mean**2 / sample_size_b
+
+print("Comparison of empirical vs theoretical moments (n=10):")
+print(f"  Mean  — Empirical: {empirical_mean_T:.4f},  Theoretical: {theoretical_mean_T:.4f}")
+print(f"  Var   — Empirical: {empirical_var_T:.4f},  Theoretical: {theoretical_var_T:.4f}")
+```
+
+#### (iv) Density histogram of simulated sample means
+
+By the CLT, we expect $\overline{X}_n \overset{\text{approx}}{\sim} N(\mu, \mu/\sqrt{n})$ for large $n$.
+
+```{python}
+#| label: ex3b-histogram
+#| fig-cap: "Sampling distribution of the mean for Exp(μ̂) samples of size n=10"
+fig, ax = plt.subplots(figsize=(8, 5))
+
+number_bins_T = int(np.ceil(np.sqrt(number_replicates_b)))
+ax.hist(mean_T, bins=number_bins_T, density=True,
+        edgecolor='black', alpha=0.7, label='Histogram of sample means')
+
+ax.set_xlabel('Sample mean')
+ax.set_ylabel('Density')
+ax.set_title(f'Sampling distribution of $\\bar{{X}}_{{10}}$ (Exponential parent)')
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+The histogram is roughly bell-shaped but still shows some right-skewness inherited from the Exponential parent distribution. With only $n = 10$, the CLT approximation is not yet perfect for this skewed distribution.
+
+#### (v) Overlay the expected large-sample Normal density
+
+```{python}
+#| label: ex3b-overlay
+#| fig-cap: "Sampling distribution of X̄₁₀ with CLT Normal density overlay"
+fig, ax = plt.subplots(figsize=(8, 5))
+
+ax.hist(mean_T, bins=number_bins_T, density=True,
+        edgecolor='black', alpha=0.7, label='Histogram of sample means')
+
+# CLT Normal density
+x_grid = np.linspace(mean_T.min() - 0.2, mean_T.max() + 0.2, 300)
+clt_pdf = stats.norm.pdf(x_grid, loc=theoretical_mean_T,
+                         scale=np.sqrt(theoretical_var_T))
+ax.plot(x_grid, clt_pdf, 'r-', linewidth=2, label='CLT Normal density')
+
+ax.set_xlabel('Sample mean')
+ax.set_ylabel('Density')
+ax.set_title(f'Sampling distribution of $\\bar{{X}}_{{10}}$ with CLT Normal overlay')
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+The Normal density provides a reasonable approximation to the sampling distribution, but there is noticeable right-skewness in the histogram that the symmetric Normal density cannot capture. For $n = 10$, the CLT approximation is only moderate for the Exponential distribution.
+
+We can also examine the standardised sample averages. Recall that the CLT says $\sqrt{n}(\overline{X}_n - \mu)/\sigma \overset{d}{\to} N(0,1)$. Since $\sigma = \mu$ for the Exponential distribution:
+
+```{python}
+#| label: ex3b-standardised
+#| fig-cap: "Standardised sample means (n=10) with standard Normal density"
+standardised_means = np.sqrt(sample_size_b) * (mean_T - kevlar_mean) / kevlar_mean
+
+fig, ax = plt.subplots(figsize=(8, 5))
+
+ax.hist(standardised_means, bins=number_bins_T, density=True,
+        edgecolor='black', alpha=0.7, label='Standardised sample means')
+
+z_grid = np.linspace(-4, 4, 300)
+ax.plot(z_grid, stats.norm.pdf(z_grid), 'r-', linewidth=2,
+        label='$N(0,1)$ density')
+
+ax.set_xlabel('Standardised sample mean')
+ax.set_ylabel('Density')
+ax.set_title(f'Standardised $\\bar{{X}}_{{10}}$ vs Standard Normal')
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+### (c) Repeat with $n = 500$
+
+We now repeat part (b) with a much larger sample size $n = 500$ to see how the CLT approximation improves.
+
+#### (i) Simulate and compute means
+
+```{python}
+#| label: ex3c-simulate
+sample_size_c = 500
+number_replicates_c = 1000
+
+exponential_samples_c = rng.exponential(
+    scale=kevlar_mean,
+    size=(number_replicates_c, sample_size_c)
+)
+
+mean_T_c = exponential_samples_c.mean(axis=1)
+print(f"Matrix shape: {exponential_samples_c.shape}")
+```
+
+#### (ii) Compare empirical and theoretical moments
+
+```{python}
+#| label: ex3c-moments
+empirical_mean_c = mean_T_c.mean()
+empirical_var_c = mean_T_c.var(ddof=1)
+
+theoretical_mean_c = kevlar_mean
+theoretical_var_c = kevlar_mean**2 / sample_size_c
+
+print("Comparison of empirical vs theoretical moments (n=500):")
+print(f"  Mean  — Empirical: {empirical_mean_c:.4f},  Theoretical: {theoretical_mean_c:.4f}")
+print(f"  Var   — Empirical: {empirical_var_c:.6f},  Theoretical: {theoretical_var_c:.6f}")
+```
+
+The empirical moments are now much closer to the theoretical values because the larger sample size reduces the variability of the sample mean.
+
+#### (iii) Density histogram with CLT Normal overlay
+
+```{python}
+#| label: ex3c-histogram
+#| fig-cap: "Sampling distribution of X̄₅₀₀ with CLT Normal density overlay"
+fig, ax = plt.subplots(figsize=(8, 5))
+
+number_bins_c = int(np.ceil(np.sqrt(number_replicates_c)))
+ax.hist(mean_T_c, bins=number_bins_c, density=True,
+        edgecolor='black', alpha=0.7, label='Histogram of sample means')
+
+x_grid = np.linspace(mean_T_c.min() - 0.05, mean_T_c.max() + 0.05, 300)
+clt_pdf_c = stats.norm.pdf(x_grid, loc=theoretical_mean_c,
+                           scale=np.sqrt(theoretical_var_c))
+ax.plot(x_grid, clt_pdf_c, 'r-', linewidth=2, label='CLT Normal density')
+
+ax.set_xlabel('Sample mean')
+ax.set_ylabel('Density')
+ax.set_title(f'Sampling distribution of $\\bar{{X}}_{{500}}$ with CLT Normal overlay')
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+#### (iv) Standardised sample means
+
+```{python}
+#| label: ex3c-standardised
+#| fig-cap: "Standardised sample means (n=500) with standard Normal density"
+standardised_means_c = np.sqrt(sample_size_c) * (mean_T_c - kevlar_mean) / kevlar_mean
+
+fig, ax = plt.subplots(figsize=(8, 5))
+
+ax.hist(standardised_means_c, bins=number_bins_c, density=True,
+        edgecolor='black', alpha=0.7, label='Standardised sample means')
+
+z_grid = np.linspace(-4, 4, 300)
+ax.plot(z_grid, stats.norm.pdf(z_grid), 'r-', linewidth=2,
+        label='$N(0,1)$ density')
+
+ax.set_xlabel('Standardised sample mean')
+ax.set_ylabel('Density')
+ax.set_title(f'Standardised $\\bar{{X}}_{{500}}$ vs Standard Normal')
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+With $n = 500$, the CLT approximation is now excellent. The histogram of the sample means is almost perfectly symmetric and bell-shaped, and the Normal density provides a very close fit. Comparing to $n = 10$, the skewness has essentially vanished. The shape and variance of the parent distribution determine the speed of convergence to Normality, but for $n = 500$ even the heavily skewed Exponential distribution produces sample means that are very well approximated by a Normal distribution.
+
+### Summary of CLT convergence
+
+```{python}
+#| label: summary-comparison
+#| fig-cap: "Comparing CLT convergence for n=10 vs n=500"
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+# n = 10
+axes[0].hist(standardised_means, bins=30, density=True,
+             edgecolor='black', alpha=0.7, label='n = 10')
+axes[0].plot(z_grid, stats.norm.pdf(z_grid), 'r-', linewidth=2, label='N(0,1)')
+axes[0].set_xlabel('Standardised sample mean')
+axes[0].set_ylabel('Density')
+axes[0].set_title('n = 10')
+axes[0].legend()
+axes[0].set_xlim(-4, 4)
+
+# n = 500
+axes[1].hist(standardised_means_c, bins=30, density=True,
+             edgecolor='black', alpha=0.7, label='n = 500')
+axes[1].plot(z_grid, stats.norm.pdf(z_grid), 'r-', linewidth=2, label='N(0,1)')
+axes[1].set_xlabel('Standardised sample mean')
+axes[1].set_ylabel('Density')
+axes[1].set_title('n = 500')
+axes[1].legend()
+axes[1].set_xlim(-4, 4)
+
+plt.suptitle('CLT convergence: Exponential parent distribution', fontsize=14)
+plt.tight_layout()
+plt.show()
+```
+
+The side-by-side comparison makes the effect of sample size on the CLT approximation very clear. For $n = 10$, the right-skewness of the Exponential parent distribution is still visible in the standardised sample means. For $n = 500$, the standardised sample means are essentially indistinguishable from a standard Normal distribution. This illustrates the power of the Central Limit Theorem: regardless of the parent distribution (provided it has finite variance), the distribution of the sample mean converges to a Normal distribution as $n \to \infty$.
